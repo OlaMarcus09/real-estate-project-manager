@@ -1,12 +1,24 @@
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export let db;
 
 export const initDB = async () => {
   try {
+    // Use different database path for production (Railway has ephemeral storage)
+    const dbPath = process.env.NODE_ENV === 'production' 
+      ? '/tmp/real_estate.db'  // Railway ephemeral storage
+      : './real_estate.db';    // Local development
+    
+    console.log(`📁 Using database path: ${dbPath}`);
+    
     db = await open({
-      filename: './real_estate.db',
+      filename: dbPath,
       driver: sqlite3.Database
     });
 
@@ -29,6 +41,15 @@ export const initDB = async () => {
         role TEXT NOT NULL,
         hourly_rate REAL NOT NULL,
         contact TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS project_workers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER,
+        worker_id INTEGER,
+        hours_worked REAL DEFAULT 0,
+        assigned_rate REAL NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -63,9 +84,9 @@ export const initDB = async () => {
       );
     `);
 
-    console.log('✅ SQLite database initialized successfully');
+    console.log('✅ Database initialized successfully');
     
-    // Add sample data
+    // Add sample data only if no projects exist
     const projectCount = await db.get('SELECT COUNT(*) as count FROM projects');
     if (projectCount.count === 0) {
       await db.run(
@@ -76,5 +97,6 @@ export const initDB = async () => {
     }
   } catch (err) {
     console.error('❌ Database initialization error:', err);
+    throw err; // Re-throw to fail deployment if DB fails
   }
 };
