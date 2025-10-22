@@ -4,16 +4,15 @@ import {
   DollarSign, 
   Folder, 
   Users, 
-  TrendingUp,
-  Activity
+  TrendingUp 
 } from 'lucide-react';
-import { dashboardAPI } from '../services/api';
+import { api } from '../services/api';
 
 export default function Dashboard() {
-  const { data: summary, isLoading } = useQuery({
-    queryKey: ['dashboard'],
+  const { data: projects, isLoading } = useQuery({
+    queryKey: ['projects'],
     queryFn: async () => {
-      const { data } = await dashboardAPI.getSummary();
+      const { data } = await api.get('/projects');
       return data;
     }
   });
@@ -26,28 +25,31 @@ export default function Dashboard() {
     );
   }
 
+  const totalBudget = projects?.reduce((sum, project) => sum + (project.budget || 0), 0) || 0;
+  const activeProjects = projects?.filter(p => p.status === 'Active').length || 0;
+
   const stats = [
     {
       title: 'Total Projects',
-      value: summary?.totalProjects || 0,
+      value: projects?.length || 0,
       icon: Folder,
       color: 'blue'
     },
     {
       title: 'Active Projects',
-      value: summary?.activeProjects || 0,
-      icon: Activity,
+      value: activeProjects,
+      icon: TrendingUp,
       color: 'green'
     },
     {
       title: 'Total Budget',
-      value: `$${(summary?.totalBudget || 0).toLocaleString()}`,
+      value: `$${totalBudget.toLocaleString()}`,
       icon: DollarSign,
-      color: 'emerald'
+      color: 'purple'
     },
     {
-      title: 'Total Workers',
-      value: summary?.totalWorkers || 0,
+      title: 'Team Members',
+      value: '0', // We'll update this later
       icon: Users,
       color: 'orange'
     },
@@ -74,15 +76,20 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Projects */}
       <div className="bg-white rounded-lg shadow-sm border p-4">
-        <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+        <h2 className="text-lg font-semibold mb-4">Recent Projects</h2>
         <div className="space-y-3">
-          {summary?.recentActivity?.map((activity, index) => (
-            <div key={index} className="flex items-center space-x-3 text-sm">
-              <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-              <span className="text-gray-600">{activity.action}</span>
-              <span className="text-gray-400">{activity.timestamp}</span>
+          {projects?.slice(0, 5).map((project) => (
+            <div key={project.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <h3 className="font-medium text-gray-900">{project.name}</h3>
+                <p className="text-sm text-gray-600">{project.status} • ${project.budget?.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-medium text-gray-900">{project.progress_percent}%</div>
+                <div className="text-xs text-gray-500">Progress</div>
+              </div>
             </div>
           ))}
         </div>

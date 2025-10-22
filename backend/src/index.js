@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import { initDB, db } from './config/database.js';
+import projectRoutes from './routes/projects.js';
+import workerRoutes from './routes/workers.js';
+import vendorRoutes from './routes/vendors.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -13,29 +16,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Projects routes
-app.get('/api/projects', async (req, res) => {
-  try {
-    const projects = await req.db.all('SELECT * FROM projects ORDER BY created_at DESC');
-    res.json(projects);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/projects', async (req, res) => {
-  try {
-    const { name, budget, start_date, status } = req.body;
-    const result = await req.db.run(
-      'INSERT INTO projects (name, budget, start_date, status) VALUES (?, ?, ?, ?)',
-      [name, budget, start_date, status || 'Planning']
-    );
-    const project = await req.db.get('SELECT * FROM projects WHERE id = ?', [result.lastID]);
-    res.status(201).json(project);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+// Routes
+app.use('/api/projects', projectRoutes);
+app.use('/api/workers', workerRoutes);
+app.use('/api/vendors', vendorRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -51,6 +35,5 @@ initDB().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Backend server running on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-    console.log(`📋 Projects API: http://localhost:${PORT}/api/projects`);
   });
 });
