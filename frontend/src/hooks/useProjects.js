@@ -5,9 +5,11 @@ export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      const { data } = await projectsAPI.getAll();
-      return data;
-    }
+      const response = await projectsAPI.getAll();
+      return response.data;
+    },
+    retry: 3, // Retry failed requests
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
@@ -27,6 +29,17 @@ export function useUpdateProject() {
   
   return useMutation({
     mutationFn: ({ id, ...project }) => projectsAPI.update(id, project),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['projects']);
+    }
+  });
+}
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: projectsAPI.delete,
     onSuccess: () => {
       queryClient.invalidateQueries(['projects']);
     }
