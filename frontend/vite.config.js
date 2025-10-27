@@ -11,10 +11,5 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false
-  },
-  resolve: {
-    alias: {
-      // Add any necessary aliases here
-    }
   }
 })
