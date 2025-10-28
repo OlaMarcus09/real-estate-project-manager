@@ -1,21 +1,15 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, User, DollarSign, Clock, Briefcase, Trash2 } from 'lucide-react';
-import { api } from '../services/api';
+import { workersAPI, formatCurrency } from '../services/api';
 
 export default function Workers() {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isAssignFormOpen, setIsAssignFormOpen] = useState(false);
-  const [selectedWorker, setSelectedWorker] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     role: '',
     hourly_rate: '',
     contact: ''
-  });
-  const [assignData, setAssignData] = useState({
-    project_id: '',
-    hours_worked: ''
   });
 
   const queryClient = useQueryClient();
@@ -23,41 +17,26 @@ export default function Workers() {
   const { data: workers, isLoading } = useQuery({
     queryKey: ['workers'],
     queryFn: async () => {
-      const { data } = await api.get('/workers');
-      return data;
-    }
-  });
-
-  const { data: projects } = useQuery({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const { data } = await api.get('/projects');
-      return data;
+      const response = await workersAPI.getAll();
+      return response.data;
     }
   });
 
   const createWorkerMutation = useMutation({
-    mutationFn: (newWorker) => api.post('/workers', newWorker),
+    mutationFn: (newWorker) => workersAPI.create(newWorker),
     onSuccess: () => {
       queryClient.invalidateQueries(['workers']);
       setIsFormOpen(false);
       setFormData({ name: '', role: '', hourly_rate: '', contact: '' });
-    }
-  });
-
-  const assignWorkerMutation = useMutation({
-    mutationFn: ({ workerId, ...data }) => 
-      api.post(`/workers/${workerId}/assign`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['workers']);
-      setIsAssignFormOpen(false);
-      setAssignData({ project_id: '', hours_worked: '' });
-      setSelectedWorker(null);
+    },
+    onError: (error) => {
+      console.error('Error creating worker:', error);
+      alert('Error creating worker. Please check console for details.');
     }
   });
 
   const deleteWorkerMutation = useMutation({
-    mutationFn: (id) => api.delete(`/workers/${id}`),
+    mutationFn: (id) => workersAPI.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['workers']);
     }
@@ -71,27 +50,9 @@ export default function Workers() {
     });
   };
 
-  const handleAssignSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedWorker) return;
-    
-    assignWorkerMutation.mutate({
-      workerId: selectedWorker.id,
-      project_id: parseInt(assignData.project_id),
-      hours_worked: parseFloat(assignData.hours_worked) || 0
-    });
-  };
-
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleAssignChange = (e) => {
-    setAssignData({
-      ...assignData,
       [e.target.name]: e.target.value
     });
   };
@@ -102,15 +63,9 @@ export default function Workers() {
     }
   };
 
-  const openAssignForm = (worker) => {
-    setSelectedWorker(worker);
-    setIsAssignFormOpen(true);
-  };
-
-  const calculateLaborCost = (worker) => {
-    // In a real app, we'd calculate based on actual hours worked
-    // For now, we'll estimate based on hourly rate
-    return worker.hourly_rate * 160; // 160 hours = 1 month
+  const calculateMonthlyCost = (worker) => {
+    // Estimate monthly cost: hourly_rate * 8 hours/day * 22 days/month
+    return worker.hourly_rate * 8 * 22;
   };
 
   if (isLoading) {
@@ -126,7 +81,7 @@ export default function Workers() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Workers</h1>
-          <p className="text-gray-600">Manage your team and labor costs</p>
+          <p className="text-gray-600">Manage your team and labor costs in Naira</p>
         </div>
         <button
           onClick={() => setIsFormOpen(true)}
@@ -166,7 +121,7 @@ export default function Workers() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Hourly Rate ($)</label>
+                <label className="block text-sm font-medium text-gray-700">Hourly Rate (₦)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -209,71 +164,6 @@ export default function Workers() {
         </div>
       )}
 
-      {/* Assign Worker Modal */}
-      {isAssignFormOpen && selectedWorker && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">
-              Assign {selectedWorker.name} to Project
-            </h2>
-            <form onSubmit={handleAssignSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Project</label>
-                <select
-                  name="project_id"
-                  value={assignData.project_id}
-                  onChange={handleAssignChange}
-                  required
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select a project</option>
-                  {projects?.map(project => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Hours Worked (optional)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  name="hours_worked"
-                  value={assignData.hours_worked}
-                  onChange={handleAssignChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0"
-                />
-              </div>
-              <div className="bg-blue-50 p-3 rounded-md">
-                <p className="text-sm text-blue-700">
-                  Hourly Rate: <strong>${selectedWorker.hourly_rate}/hour</strong>
-                </p>
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAssignFormOpen(false)}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={assignWorkerMutation.isLoading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                >
-                  {assignWorkerMutation.isLoading ? 'Assigning...' : 'Assign to Project'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Workers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {workers?.length === 0 ? (
@@ -309,17 +199,15 @@ export default function Workers() {
                     <DollarSign size={16} />
                     <span>Hourly Rate</span>
                   </div>
-                  <span className="font-medium">${worker.hourly_rate}/hr</span>
+                  <span className="font-medium">{formatCurrency(worker.hourly_rate)}/hr</span>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2 text-gray-600">
                     <Briefcase size={16} />
-                    <span>Projects</span>
+                    <span>Status</span>
                   </div>
-                  <span className="font-medium">
-                    {worker.assigned_project_ids?.length || 0}
-                  </span>
+                  <span className="font-medium text-green-600">Active</span>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
@@ -328,39 +216,22 @@ export default function Workers() {
                     <span>Monthly Cost</span>
                   </div>
                   <span className="font-medium text-green-600">
-                    ${calculateLaborCost(worker).toLocaleString()}
+                    {formatCurrency(calculateMonthlyCost(worker))}
                   </span>
                 </div>
               </div>
 
-              {worker.assigned_project_names?.length > 0 && (
+              {worker.contact && (
                 <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Assigned to:</p>
-                  <div className="space-y-1">
-                    {worker.assigned_project_names.map((projectName, index) => (
-                      <div key={index} className="text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded">
-                        {projectName}
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Contact:</p>
+                  <p className="text-sm text-gray-600">{worker.contact}</p>
                 </div>
               )}
 
-              <div className="mt-6 flex space-x-2">
-                <button
-                  onClick={() => openAssignForm(worker)}
-                  className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700"
-                >
-                  Assign to Project
+              <div className="mt-6">
+                <button className="w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700">
+                  View Details
                 </button>
-                {worker.contact && (
-                  <a
-                    href={`tel:${worker.contact}`}
-                    className="bg-gray-100 text-gray-700 py-2 px-3 rounded-md text-sm font-medium hover:bg-gray-200"
-                  >
-                    Contact
-                  </a>
-                )}
               </div>
             </div>
           ))
