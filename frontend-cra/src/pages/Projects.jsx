@@ -37,6 +37,12 @@ export default function Projects() {
     onSuccess: () => {
       queryClient.invalidateQueries(['projects']);
       setEditingProject(null);
+      setIsFormOpen(false);
+      setFormData({ name: '', budget: '', start_date: '', status: 'Planning' });
+    },
+    onError: (error) => {
+      console.error('Update error:', error);
+      alert('Error updating project: ' + error.message);
     }
   });
 
@@ -49,13 +55,17 @@ export default function Projects() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('Submitting form:', formData);
+    
     if (editingProject) {
+      console.log('Updating project:', editingProject.id);
       updateProjectMutation.mutate({
         id: editingProject.id,
         ...formData,
         budget: parseFloat(formData.budget)
       });
     } else {
+      console.log('Creating new project');
       createProjectMutation.mutate({
         ...formData,
         budget: parseFloat(formData.budget)
@@ -71,12 +81,13 @@ export default function Projects() {
   };
 
   const handleEdit = (project) => {
+    console.log('Editing project:', project);
     setEditingProject(project);
     setFormData({
-      name: project.name,
-      budget: project.budget,
-      start_date: project.start_date,
-      status: project.status
+      name: project.name || '',
+      budget: project.budget || '',
+      start_date: project.start_date || '',
+      status: project.status || 'Planning'
     });
     setIsFormOpen(true);
   };
