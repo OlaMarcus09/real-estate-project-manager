@@ -81,7 +81,3 @@ export const inventoryAPI = {
   update: (id, item) => api.put(`/inventory/${id}`, item),
   delete: (id) => api.delete(`/inventory/${id}`)
 };
-
-export const analyticsAPI = {
-  get: () => api.get('/analytics')
-};
