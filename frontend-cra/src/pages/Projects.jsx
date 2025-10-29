@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Calendar, DollarSign } from 'lucide-react';
-import { api } from '../services/api';
+import { Plus, Edit, Trash2, Calendar, DollarSign, Save, X } from 'lucide-react';
+import { projectsAPI, formatCurrency } from '../services/api';
 
 export default function Projects() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     budget: '',
@@ -17,13 +18,13 @@ export default function Projects() {
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
-      const { data } = await api.get('/projects');
-      return data;
+      const response = await projectsAPI.getAll();
+      return response.data;
     }
   });
 
   const createProjectMutation = useMutation({
-    mutationFn: (newProject) => api.post('/projects', newProject),
+    mutationFn: (newProject) => projectsAPI.create(newProject),
     onSuccess: () => {
       queryClient.invalidateQueries(['projects']);
       setIsFormOpen(false);
@@ -31,8 +32,16 @@ export default function Projects() {
     }
   });
 
+  const updateProjectMutation = useMutation({
+    mutationFn: ({ id, ...project }) => projectsAPI.update(id, project),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['projects']);
+      setEditingProject(null);
+    }
+  });
+
   const deleteProjectMutation = useMutation({
-    mutationFn: (id) => api.delete(`/projects/${id}`),
+    mutationFn: (id) => projectsAPI.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['projects']);
     }
@@ -40,10 +49,18 @@ export default function Projects() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    createProjectMutation.mutate({
-      ...formData,
-      budget: parseFloat(formData.budget)
-    });
+    if (editingProject) {
+      updateProjectMutation.mutate({
+        id: editingProject.id,
+        ...formData,
+        budget: parseFloat(formData.budget)
+      });
+    } else {
+      createProjectMutation.mutate({
+        ...formData,
+        budget: parseFloat(formData.budget)
+      });
+    }
   };
 
   const handleChange = (e) => {
@@ -51,6 +68,23 @@ export default function Projects() {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleEdit = (project) => {
+    setEditingProject(project);
+    setFormData({
+      name: project.name,
+      budget: project.budget,
+      start_date: project.start_date,
+      status: project.status
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProject(null);
+    setIsFormOpen(false);
+    setFormData({ name: '', budget: '', start_date: '', status: 'Planning' });
   };
 
   const handleDelete = (id) => {
@@ -90,11 +124,13 @@ export default function Projects() {
         </button>
       </div>
 
-      {/* Create Project Form Modal */}
+      {/* Create/Edit Project Form Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Create New Project</h2>
+            <h2 className="text-xl font-bold mb-4">
+              {editingProject ? 'Edit Project' : 'Create New Project'}
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Project Name</label>
@@ -108,7 +144,7 @@ export default function Projects() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Budget</label>
+                <label className="block text-sm font-medium text-gray-700">Budget (₦)</label>
                 <input
                   type="number"
                   name="budget"
@@ -145,17 +181,24 @@ export default function Projects() {
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setIsFormOpen(false)}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                  onClick={handleCancelEdit}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center space-x-2"
                 >
-                  Cancel
+                  <X size={16} />
+                  <span>Cancel</span>
                 </button>
                 <button
                   type="submit"
-                  disabled={createProjectMutation.isLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  disabled={createProjectMutation.isLoading || updateProjectMutation.isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
                 >
-                  {createProjectMutation.isLoading ? 'Creating...' : 'Create Project'}
+                  <Save size={16} />
+                  <span>
+                    {createProjectMutation.isLoading || updateProjectMutation.isLoading 
+                      ? 'Saving...' 
+                      : (editingProject ? 'Update Project' : 'Create Project')
+                    }
+                  </span>
                 </button>
               </div>
             </form>
@@ -179,7 +222,7 @@ export default function Projects() {
                     <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
                       <div className="flex items-center space-x-1">
                         <DollarSign size={16} />
-                        <span>${project.budget?.toLocaleString()}</span>
+                        <span>{formatCurrency(project.budget)}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Calendar size={16} />
@@ -192,7 +235,10 @@ export default function Projects() {
                       {project.status}
                     </span>
                     <div className="flex items-center space-x-2">
-                      <button className="p-2 text-gray-400 hover:text-blue-600">
+                      <button 
+                        onClick={() => handleEdit(project)}
+                        className="p-2 text-gray-400 hover:text-blue-600"
+                      >
                         <Edit size={16} />
                       </button>
                       <button 
