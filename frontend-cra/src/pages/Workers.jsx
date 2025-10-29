@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, User, DollarSign, Clock, Briefcase, Trash2 } from 'lucide-react';
+import { Plus, User, DollarSign, Clock, Briefcase, Trash2, CreditCard, History } from 'lucide-react';
 import { workersAPI, formatCurrency } from '../services/api';
+import PaymentModal from '../components/PaymentModal';
 
 export default function Workers() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedWorker, setSelectedWorker] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     role: '',
@@ -28,10 +31,6 @@ export default function Workers() {
       queryClient.invalidateQueries(['workers']);
       setIsFormOpen(false);
       setFormData({ name: '', role: '', hourly_rate: '', contact: '' });
-    },
-    onError: (error) => {
-      console.error('Error creating worker:', error);
-      alert('Error creating worker. Please check console for details.');
     }
   });
 
@@ -42,11 +41,33 @@ export default function Workers() {
     }
   });
 
+  const recordPaymentMutation = useMutation({
+    mutationFn: ({ workerId, paymentData }) => 
+      fetch(`${process.env.REACT_APP_API_URL}/api/workers/${workerId}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentData)
+      }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['workers']);
+      setIsPaymentModalOpen(false);
+      setSelectedWorker(null);
+    }
+  });
+
   const handleSubmit = (e) => {
     e.preventDefault();
     createWorkerMutation.mutate({
       ...formData,
       hourly_rate: parseFloat(formData.hourly_rate)
+    });
+  };
+
+  const handlePaymentSubmit = (paymentData) => {
+    if (!selectedWorker) return;
+    recordPaymentMutation.mutate({
+      workerId: selectedWorker.id,
+      paymentData
     });
   };
 
@@ -63,8 +84,12 @@ export default function Workers() {
     }
   };
 
+  const openPaymentModal = (worker) => {
+    setSelectedWorker(worker);
+    setIsPaymentModalOpen(true);
+  };
+
   const calculateMonthlyCost = (worker) => {
-    // Estimate monthly cost: hourly_rate * 8 hours/day * 22 days/month
     return worker.hourly_rate * 8 * 22;
   };
 
@@ -81,7 +106,7 @@ export default function Workers() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Workers</h1>
-          <p className="text-gray-600">Manage your team and labor costs in Naira</p>
+          <p className="text-gray-600">Manage your team, track payments and labor costs</p>
         </div>
         <button
           onClick={() => setIsFormOpen(true)}
@@ -164,6 +189,15 @@ export default function Workers() {
         </div>
       )}
 
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onSave={handlePaymentSubmit}
+        type="worker"
+        item={selectedWorker}
+      />
+
       {/* Workers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {workers?.length === 0 ? (
@@ -204,10 +238,12 @@ export default function Workers() {
 
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2 text-gray-600">
-                    <Briefcase size={16} />
-                    <span>Status</span>
+                    <CreditCard size={16} />
+                    <span>Total Paid</span>
                   </div>
-                  <span className="font-medium text-green-600">Active</span>
+                  <span className="font-medium text-green-600">
+                    {formatCurrency(worker.total_paid || 0)}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between text-sm">
@@ -215,10 +251,22 @@ export default function Workers() {
                     <Clock size={16} />
                     <span>Monthly Cost</span>
                   </div>
-                  <span className="font-medium text-green-600">
+                  <span className="font-medium">
                     {formatCurrency(calculateMonthlyCost(worker))}
                   </span>
                 </div>
+
+                {worker.last_payment_date && (
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2 text-gray-600">
+                      <History size={16} />
+                      <span>Last Payment</span>
+                    </div>
+                    <span className="font-medium text-gray-600">
+                      {new Date(worker.last_payment_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {worker.contact && (
@@ -228,9 +276,13 @@ export default function Workers() {
                 </div>
               )}
 
-              <div className="mt-6">
-                <button className="w-full bg-blue-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-blue-700">
-                  View Details
+              <div className="mt-6 flex space-x-2">
+                <button
+                  onClick={() => openPaymentModal(worker)}
+                  className="flex-1 bg-green-600 text-white py-2 px-3 rounded-md text-sm font-medium hover:bg-green-700 flex items-center justify-center space-x-1"
+                >
+                  <CreditCard size={16} />
+                  <span>Record Payment</span>
                 </button>
               </div>
             </div>
