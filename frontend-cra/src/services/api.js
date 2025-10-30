@@ -1,49 +1,34 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL;
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://real-estate-backend-v2.onrender.com';
 
-console.log('API Base URL:', API_BASE_URL);
+console.log('🔗 API Base URL:', API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL + '/api',
-  timeout: 30000,
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// Add request interceptor to log all API calls
-api.interceptors.request.use(
-  (config) => {
-    console.log('🔄 API Call:', config.method?.toUpperCase(), config.url);
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Add response interceptor for better error handling
+// Better error handling
 api.interceptors.response.use(
-  (response) => {
-    console.log('✅ API Success:', response.config.url);
-    return response;
-  },
+  (response) => response,
   (error) => {
+    const message = error.response?.data?.error || error.message || 'Unknown error';
     console.error('❌ API Error:', {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
-      message: error.response?.data?.error || error.message
+      message: message
     });
     
     if (error.response?.status === 404) {
-      console.error('🔍 Endpoint not found. Please check your backend routes.');
-    } else if (error.response?.status === 500) {
-      console.error('⚡ Server error. Please check your backend logs.');
+      throw new Error(`Endpoint not found: ${error.config?.url}. Check if backend is deployed correctly.`);
     }
     
-    return Promise.reject(error);
+    throw new Error(message);
   }
 );
 
@@ -53,7 +38,7 @@ export const formatCurrency = (amount) => {
   return `₦${parseFloat(amount).toLocaleString('en-NG')}`;
 };
 
-// API endpoints
+// SIMPLE API endpoints - just make them work
 export const projectsAPI = {
   getAll: () => api.get('/projects'),
   create: (project) => api.post('/projects', project),
@@ -80,4 +65,19 @@ export const inventoryAPI = {
   create: (item) => api.post('/inventory', item),
   update: (id, item) => api.put(`/inventory/${id}`, item),
   delete: (id) => api.delete(`/inventory/${id}`)
+};
+
+// Direct fetch for payments (more reliable)
+export const recordWorkerPayment = (workerId, paymentData) => {
+  return fetch(`${API_BASE_URL}/api/workers/${workerId}/payments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(paymentData)
+  }).then(async (res) => {
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(error || 'Payment failed');
+    }
+    return res.json();
+  });
 };

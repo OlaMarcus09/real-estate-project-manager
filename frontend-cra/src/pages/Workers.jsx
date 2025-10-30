@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, User, DollarSign, Clock, Briefcase, Trash2, CreditCard, History } from 'lucide-react';
-import { workersAPI, formatCurrency } from '../services/api';
+import { workersAPI, formatCurrency, recordWorkerPayment } from '../services/api';
 import PaymentModal from '../components/PaymentModal';
 
 export default function Workers() {
@@ -42,23 +42,16 @@ export default function Workers() {
   });
 
   const recordPaymentMutation = useMutation({
-    mutationFn: ({ workerId, paymentData }) => 
-      fetch(`${process.env.REACT_APP_API_URL}/api/workers/${workerId}/payments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(paymentData)
-      }).then(res => {
-        if (!res.ok) throw new Error('Payment failed');
-        return res.json();
-      }),
+    mutationFn: ({ workerId, paymentData }) => recordWorkerPayment(workerId, paymentData),
     onSuccess: () => {
       queryClient.invalidateQueries(['workers']);
       setIsPaymentModalOpen(false);
       setSelectedWorker(null);
+      alert('✅ Payment recorded successfully!');
     },
     onError: (error) => {
       console.error('Payment error:', error);
-      alert('Error recording payment: ' + error.message);
+      alert('❌ Error recording payment: ' + error.message);
     }
   });
 
@@ -93,7 +86,6 @@ export default function Workers() {
   };
 
   const openPaymentModal = (worker) => {
-    console.log('Opening payment modal for worker:', worker);
     setSelectedWorker(worker);
     setIsPaymentModalOpen(true);
   };
