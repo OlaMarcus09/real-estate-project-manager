@@ -1,20 +1,35 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://real-estate-backend-v2.onrender.com';
+// Use the NEW backend URL
+const API_BASE_URL = process.env.REACT_APP_API_URL;
 
-console.log('🔗 API Base URL:', API_BASE_URL);
+console.log('🔗 Connecting to backend:', API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL + '/api',
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// Better error handling
+// Request interceptor
+api.interceptors.request.use(
+  (config) => {
+    console.log('🔄 API Call:', config.method?.toUpperCase(), config.url);
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor with better error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ API Success:', response.config.url);
+    return response;
+  },
   (error) => {
     const message = error.response?.data?.error || error.message || 'Unknown error';
     console.error('❌ API Error:', {
@@ -24,11 +39,15 @@ api.interceptors.response.use(
       message: message
     });
     
+    // Provide user-friendly error messages
+    let userMessage = message;
     if (error.response?.status === 404) {
-      throw new Error(`Endpoint not found: ${error.config?.url}. Check if backend is deployed correctly.`);
+      userMessage = `Endpoint not found: ${error.config?.url}. Please check backend deployment.`;
+    } else if (error.code === 'NETWORK_ERROR') {
+      userMessage = 'Network error. Please check your internet connection and backend URL.';
     }
     
-    throw new Error(message);
+    throw new Error(userMessage);
   }
 );
 
@@ -38,7 +57,7 @@ export const formatCurrency = (amount) => {
   return `₦${parseFloat(amount).toLocaleString('en-NG')}`;
 };
 
-// SIMPLE API endpoints - just make them work
+// API endpoints - ALL POINTING TO NEW BACKEND
 export const projectsAPI = {
   getAll: () => api.get('/projects'),
   create: (project) => api.post('/projects', project),
@@ -75,8 +94,8 @@ export const recordWorkerPayment = (workerId, paymentData) => {
     body: JSON.stringify(paymentData)
   }).then(async (res) => {
     if (!res.ok) {
-      const error = await res.text();
-      throw new Error(error || 'Payment failed');
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Payment failed with status ${res.status}`);
     }
     return res.json();
   });
