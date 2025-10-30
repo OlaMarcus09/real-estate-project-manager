@@ -7,24 +7,27 @@ import Projects from './pages/Projects.jsx';
 import Workers from './pages/Workers.jsx';
 import Vendors from './pages/Vendors.jsx';
 import Inventory from './pages/Inventory.jsx';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/workers" element={<Workers />} />
-            <Route path="/vendors" element={<Vendors />} />
-            <Route path="/inventory" element={<Inventory />} />
-          </Routes>
-        </Layout>
-      </Router>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/workers" element={<Workers />} />
+              <Route path="/vendors" element={<Vendors />} />
+              <Route path="/inventory" element={<Inventory />} />
+            </Routes>
+          </Layout>
+        </Router>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
