@@ -157,7 +157,7 @@ export default function Dashboard() {
         <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
           <h3 className="font-semibold text-orange-900 mb-2">📦 Inventory</h3>
           <p className="text-sm text-orange-700">
-            Inventory features coming soon.
+            Track materials and equipment across all projects.
           </p>
         </div>
       </div>

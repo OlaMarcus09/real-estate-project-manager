@@ -1,24 +1,105 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Package, AlertTriangle, TrendingUp, DollarSign } from 'lucide-react';
-import { api } from '../services/api';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Package, AlertTriangle, DollarSign, Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { inventoryAPI, formatCurrency } from '../services/api';
 
 export default function Inventory() {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    category: '',
+    quantity: '',
+    unit_price: '',
+    min_stock: ''
+  });
+
+  const queryClient = useQueryClient();
+
   const { data: inventory, isLoading, error } = useQuery({
     queryKey: ['inventory'],
     queryFn: async () => {
-      try {
-        const { data } = await api.get('/inventory');
-        return data;
-      } catch (err) {
-        // If inventory endpoint doesn't exist, return empty array
-        if (err.response?.status === 404) {
-          return [];
-        }
-        throw err;
-      }
+      const response = await inventoryAPI.getAll();
+      return response.data;
     }
   });
+
+  const createInventoryMutation = useMutation({
+    mutationFn: (newItem) => inventoryAPI.create(newItem),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['inventory']);
+      setIsFormOpen(false);
+      setFormData({ name: '', category: '', quantity: '', unit_price: '', min_stock: '' });
+    }
+  });
+
+  const updateInventoryMutation = useMutation({
+    mutationFn: ({ id, ...item }) => inventoryAPI.update(id, item),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['inventory']);
+      setEditingItem(null);
+      setIsFormOpen(false);
+      setFormData({ name: '', category: '', quantity: '', unit_price: '', min_stock: '' });
+    }
+  });
+
+  const deleteInventoryMutation = useMutation({
+    mutationFn: (id) => inventoryAPI.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['inventory']);
+    }
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (editingItem) {
+      updateInventoryMutation.mutate({
+        id: editingItem.id,
+        ...formData,
+        quantity: parseInt(formData.quantity),
+        unit_price: parseFloat(formData.unit_price),
+        min_stock: parseInt(formData.min_stock)
+      });
+    } else {
+      createInventoryMutation.mutate({
+        ...formData,
+        quantity: parseInt(formData.quantity),
+        unit_price: parseFloat(formData.unit_price),
+        min_stock: parseInt(formData.min_stock)
+      });
+    }
+  };
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setFormData({
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      min_stock: item.min_stock
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItem(null);
+    setIsFormOpen(false);
+    setFormData({ name: '', category: '', quantity: '', unit_price: '', min_stock: '' });
+  };
+
+  const handleDelete = (id, name) => {
+    if (window.confirm(`Are you sure you want to delete "${name}" from inventory?`)) {
+      deleteInventoryMutation.mutate(id);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -41,7 +122,106 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory Dashboard</h1>
           <p className="text-gray-600">Manage materials, equipment, and supplies</p>
         </div>
+        <button
+          onClick={() => setIsFormOpen(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+        >
+          <Plus size={20} />
+          <span>Add Item</span>
+        </button>
       </div>
+
+      {/* Add/Edit Inventory Form Modal */}
+      {isFormOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {editingItem ? 'Edit Inventory Item' : 'Add New Inventory Item'}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Item Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Category</label>
+                <input
+                  type="text"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                <input
+                  type="number"
+                  name="quantity"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Unit Price (₦)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="unit_price"
+                  value={formData.unit_price}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Min Stock Level</label>
+                <input
+                  type="number"
+                  name="min_stock"
+                  value={formData.min_stock}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center space-x-2"
+                >
+                  <X size={16} />
+                  <span>Cancel</span>
+                </button>
+                <button
+                  type="submit"
+                  disabled={createInventoryMutation.isLoading || updateInventoryMutation.isLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+                >
+                  <Save size={16} />
+                  <span>
+                    {createInventoryMutation.isLoading || updateInventoryMutation.isLoading 
+                      ? 'Saving...' 
+                      : (editingItem ? 'Update Item' : 'Add Item')
+                    }
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Inventory Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -80,7 +260,7 @@ export default function Inventory() {
             <div>
               <p className="text-sm font-medium text-gray-600">Total Value</p>
               <p className="text-2xl font-bold text-green-600">
-                ${totalValue.toLocaleString()}
+                {formatCurrency(totalValue)}
               </p>
             </div>
             <DollarSign className="h-8 w-8 text-green-600" />
@@ -104,7 +284,7 @@ export default function Inventory() {
           <div className="p-8 text-center">
             <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No inventory items</h3>
-            <p className="text-gray-500">Inventory management features coming soon...</p>
+            <p className="text-gray-500">Get started by adding your first inventory item using the "Add Item" button above.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -127,7 +307,13 @@ export default function Inventory() {
                     Total Value
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Min Stock
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -144,12 +330,15 @@ export default function Inventory() {
                       <div className="text-sm text-gray-900">{item.quantity}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">${item.unit_price}</div>
+                      <div className="text-sm text-gray-900">{formatCurrency(item.unit_price)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        ${(item.quantity * item.unit_price).toLocaleString()}
+                        {formatCurrency(item.quantity * item.unit_price)}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{item.min_stock}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -162,6 +351,22 @@ export default function Inventory() {
                         {item.quantity === 0 ? 'Out of Stock' : 
                          item.quantity <= (item.min_stock || 5) ? 'Low Stock' : 'In Stock'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEdit(item)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id, item.name)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

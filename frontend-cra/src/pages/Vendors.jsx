@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Star, Phone, Mail, Building, Trash2 } from 'lucide-react';
-import { api } from '../services/api';
+import { Plus, Star, Phone, Mail, Building, Trash2, Edit } from 'lucide-react';
+import { vendorsAPI, formatCurrency } from '../services/api';
 
 export default function Vendors() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -17,13 +17,13 @@ export default function Vendors() {
   const { data: vendors, isLoading } = useQuery({
     queryKey: ['vendors'],
     queryFn: async () => {
-      const { data } = await api.get('/vendors');
-      return data;
+      const response = await vendorsAPI.getAll();
+      return response.data;
     }
   });
 
   const createVendorMutation = useMutation({
-    mutationFn: (newVendor) => api.post('/vendors', newVendor),
+    mutationFn: (newVendor) => vendorsAPI.create(newVendor),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendors']);
       setIsFormOpen(false);
@@ -32,9 +32,13 @@ export default function Vendors() {
   });
 
   const deleteVendorMutation = useMutation({
-    mutationFn: (id) => api.delete(`/vendors/${id}`),
+    mutationFn: (id) => vendorsAPI.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendors']);
+    },
+    onError: (error) => {
+      console.error('Delete vendor error:', error);
+      alert('Error deleting vendor: ' + error.message);
     }
   });
 
@@ -52,6 +56,7 @@ export default function Vendors() {
 
   const handleDelete = (id, name) => {
     if (window.confirm(`Are you sure you want to delete vendor "${name}"?`)) {
+      console.log('Deleting vendor ID:', id);
       deleteVendorMutation.mutate(id);
     }
   };
@@ -241,6 +246,15 @@ export default function Vendors() {
                         <span>{vendor.contact}</span>
                       </>
                     )}
+                  </div>
+                )}
+                
+                {vendor.total_paid > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Total Paid:</span>
+                    <span className="text-sm font-medium text-green-600">
+                      {formatCurrency(vendor.total_paid)}
+                    </span>
                   </div>
                 )}
                 
