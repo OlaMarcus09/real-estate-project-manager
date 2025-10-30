@@ -1,10 +1,10 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Building, Users, Truck, Package, TrendingUp, AlertTriangle } from 'lucide-react';
-import { projectsAPI, workersAPI, vendorsAPI, inventoryAPI, formatCurrency } from '../services/api';
+import { Folder, Users, Truck, Package, TrendingUp, AlertTriangle } from 'lucide-react';
+import { projectsAPI, workersAPI, vendorsAPI, formatCurrency } from '../services/api';
 
 export default function Dashboard() {
-  const { data: projects } = useQuery({
+  const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
       const response = await projectsAPI.getAll();
@@ -12,7 +12,7 @@ export default function Dashboard() {
     }
   });
 
-  const { data: workers } = useQuery({
+  const { data: workers, isLoading: workersLoading } = useQuery({
     queryKey: ['workers'],
     queryFn: async () => {
       const response = await workersAPI.getAll();
@@ -20,7 +20,7 @@ export default function Dashboard() {
     }
   });
 
-  const { data: vendors } = useQuery({
+  const { data: vendors, isLoading: vendorsLoading } = useQuery({
     queryKey: ['vendors'],
     queryFn: async () => {
       const response = await vendorsAPI.getAll();
@@ -28,174 +28,137 @@ export default function Dashboard() {
     }
   });
 
-  const { data: inventory } = useQuery({
-    queryKey: ['inventory'],
-    queryFn: async () => {
-      const response = await inventoryAPI.getAll();
-      return response.data;
-    }
-  });
+  const isLoading = projectsLoading || workersLoading || vendorsLoading;
 
-  // Calculate stats
-  const activeProjects = projects?.filter(p => p.status === 'In Progress')?.length || 0;
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Calculate stats from individual API calls
+  const totalProjects = projects?.length || 0;
   const totalWorkers = workers?.length || 0;
   const totalVendors = vendors?.length || 0;
-  const lowStockItems = inventory?.filter(item => item.quantity <= (item.min_stock || 5))?.length || 0;
-  const totalBudget = projects?.reduce((sum, project) => sum + (project.budget || 0), 0) || 0;
-  const totalInventoryValue = inventory?.reduce((sum, item) => sum + (item.quantity * (item.unit_price || 0)), 0) || 0;
-
-  const recentProjects = projects?.slice(0, 5) || [];
-  const lowInventoryItems = inventory?.filter(item => item.quantity <= (item.min_stock || 5))?.slice(0, 5) || [];
+  const totalBudget = projects?.reduce((sum, project) => sum + (parseFloat(project.budget) || 0), 0) || 0;
+  const totalSpent = projects?.reduce((sum, project) => sum + (parseFloat(project.spent) || 0), 0) || 0;
+  const activeProjects = projects?.filter(p => p.status === 'Active')?.length || 0;
 
   return (
     <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Project Management Dashboard</h1>
-        <p className="text-gray-600 mt-2">Welcome to your construction project management system</p>
-      </div>
-
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Project Overview</h1>
+      <p className="text-gray-600 mb-6">Real Estate Management Dashboard • Currency: Nigerian Naira (₦)</p>
+      
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Projects</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{activeProjects}</p>
+              <p className="text-sm font-medium text-gray-600">Total Projects</p>
+              <p className="text-2xl font-bold text-gray-900">{totalProjects}</p>
+              <p className="text-sm text-green-600">{activeProjects} active</p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Building className="text-blue-600" size={24} />
-            </div>
+            <Folder className="h-8 w-8 text-blue-600" />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Workers</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{totalWorkers}</p>
+              <p className="text-sm font-medium text-gray-600">Team Workers</p>
+              <p className="text-2xl font-bold text-gray-900">{totalWorkers}</p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Users className="text-green-600" size={24} />
-            </div>
+            <Users className="h-8 w-8 text-green-600" />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Vendor Partners</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{totalVendors}</p>
+              <p className="text-sm font-medium text-gray-600">Vendors</p>
+              <p className="text-2xl font-bold text-gray-900">{totalVendors}</p>
             </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Truck className="text-purple-600" size={24} />
-            </div>
+            <Truck className="h-8 w-8 text-purple-600" />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Low Stock Items</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{lowStockItems}</p>
+              <p className="text-sm font-medium text-gray-600">Total Budget</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(totalBudget)}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                Spent: {formatCurrency(totalSpent)}
+              </p>
             </div>
-            <div className="p-3 bg-red-100 rounded-lg">
-              <AlertTriangle className="text-red-600" size={24} />
-            </div>
+            <TrendingUp className="h-8 w-8 text-orange-600" />
           </div>
         </div>
       </div>
 
-      {/* Financial Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Financial Overview</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Total Project Budget</span>
-              <span className="font-semibold text-gray-900">{formatCurrency(totalBudget)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Inventory Value</span>
-              <span className="font-semibold text-gray-900">{formatCurrency(totalInventoryValue)}</span>
-            </div>
-          </div>
+      {/* Recent Projects */}
+      <div className="bg-white rounded-lg shadow-sm border mb-6">
+        <div className="p-4 border-b">
+          <h2 className="text-xl font-semibold">Recent Projects</h2>
         </div>
-
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <button className="p-4 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors text-center">
-              <Building className="mx-auto mb-2" size={20} />
-              <div className="text-sm font-medium">New Project</div>
-            </button>
-            <button className="p-4 bg-green-50 rounded-lg text-green-700 hover:bg-green-100 transition-colors text-center">
-              <Users className="mx-auto mb-2" size={20} />
-              <div className="text-sm font-medium">Add Worker</div>
-            </button>
-            <button className="p-4 bg-purple-50 rounded-lg text-purple-700 hover:bg-purple-100 transition-colors text-center">
-              <Truck className="mx-auto mb-2" size={20} />
-              <div className="text-sm font-medium">Add Vendor</div>
-            </button>
-            <button className="p-4 bg-orange-50 rounded-lg text-orange-700 hover:bg-orange-100 transition-colors text-center">
-              <Package className="mx-auto mb-2" size={20} />
-              <div className="text-sm font-medium">Add Inventory</div>
-            </button>
-          </div>
+        <div className="p-4">
+          {!projects || projects.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No projects yet. Create your first project!
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {projects.slice(0, 5).map((project) => (
+                <div key={project.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium text-gray-900">{project.name}</h3>
+                    <p className="text-sm text-gray-600">
+                      Budget: {formatCurrency(project.budget)} • {project.status}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-900">
+                      {project.progress_percent || 0}%
+                    </div>
+                    <div className="w-24 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full" 
+                        style={{ width: `${project.progress_percent || 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Recent Projects & Low Stock */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Projects</h2>
-          </div>
-          <div className="p-6">
-            {recentProjects.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No projects yet</p>
-            ) : (
-              <div className="space-y-4">
-                {recentProjects.map((project) => (
-                  <div key={project.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{project.name}</p>
-                      <p className="text-sm text-gray-600">{project.status}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-gray-900">{formatCurrency(project.budget || 0)}</p>
-                      <p className="text-sm text-gray-600">{project.location}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <h3 className="font-semibold text-blue-900 mb-2">💰 Budget Management</h3>
+          <p className="text-sm text-blue-700">
+            Track project budgets and expenses in Nigerian Naira.
+          </p>
         </div>
-
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Low Stock Alert</h2>
-          </div>
-          <div className="p-6">
-            {lowInventoryItems.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">All items are well stocked</p>
-            ) : (
-              <div className="space-y-4">
-                {lowInventoryItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-600">{item.category}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-red-600">{item.quantity} left</p>
-                      <p className="text-sm text-gray-600">Min: {item.min_stock || 5}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <h3 className="font-semibold text-green-900 mb-2">👥 Team Overview</h3>
+          <p className="text-sm text-green-700">
+            Manage workers, vendors, and project assignments.
+          </p>
+        </div>
+        
+        <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+          <h3 className="font-semibold text-orange-900 mb-2">📦 Inventory</h3>
+          <p className="text-sm text-orange-700">
+            Track materials and equipment across all projects.
+          </p>
         </div>
       </div>
     </div>
