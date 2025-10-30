@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Star, Phone, Mail, Building, Trash2, Edit } from 'lucide-react';
+import { Plus, Star, Phone, Mail, Building, Trash2 } from 'lucide-react';
 import { vendorsAPI, formatCurrency } from '../services/api';
 
 export default function Vendors() {
@@ -38,7 +38,7 @@ export default function Vendors() {
     },
     onError: (error) => {
       console.error('Delete vendor error:', error);
-      alert('Error deleting vendor: ' + error.message);
+      alert('Error deleting vendor: ' + (error.response?.data?.message || error.message));
     }
   });
 
@@ -54,10 +54,13 @@ export default function Vendors() {
     });
   };
 
-  const handleDelete = (id, name) => {
+  const handleDelete = async (id, name) => {
     if (window.confirm(`Are you sure you want to delete vendor "${name}"?`)) {
-      console.log('Deleting vendor ID:', id);
-      deleteVendorMutation.mutate(id);
+      try {
+        await deleteVendorMutation.mutateAsync(id);
+      } catch (error) {
+        console.error('Delete failed:', error);
+      }
     }
   };
 
@@ -220,6 +223,7 @@ export default function Vendors() {
                 <button
                   onClick={() => handleDelete(vendor.id, vendor.name)}
                   className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                  disabled={deleteVendorMutation.isLoading}
                 >
                   <Trash2 size={16} />
                 </button>
