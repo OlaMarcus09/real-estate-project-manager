@@ -7,7 +7,7 @@ import Projects from './pages/Projects.jsx';
 import Workers from './pages/Workers.jsx';
 import Vendors from './pages/Vendors.jsx';
 import Inventory from './pages/Inventory.jsx';
-import ErrorBoundary from './components/ErrorBoundary';
+import ErrorBoundary from './components/ErrorBoundary.’jsx;
 
 const queryClient = new QueryClient();
 
